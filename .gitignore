@@ -1,0 +1,2 @@
+*.py[cd]
+__pycache__/
