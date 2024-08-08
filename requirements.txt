@@ -1,2 +1,2 @@
 requests
-click
+tqdm
