@@ -5,6 +5,7 @@ import argparse
 import os
 import re
 import sys
+from multiprocessing import Pool
 
 import requests
 from tqdm import tqdm
@@ -18,7 +19,7 @@ def download_file(file_dict, folder_name="tmp"):
     filename = file_dict.get("filename")
     url = file_dict["links"]["normal_download"]
 
-    page = requests.get(url).text
+    page = requests.get(url, timeout=5).text
     link = re.search(r'href="((http|https)://download[^"]+)', page)
 
     if link:
@@ -29,7 +30,7 @@ def download_file(file_dict, folder_name="tmp"):
 
     size = int(file_dict.get("size", "0"))
 
-    res = requests.get(link, stream=True)
+    res = requests.get(link, stream=True, timeout=30)
     filepath = f"{folder_name}/{filename}"
 
     with open(filepath, "wb") as f:
@@ -39,7 +40,7 @@ def download_file(file_dict, folder_name="tmp"):
             pbar.update(len(chunk))
 
 
-def download_folder(folder_url: str):
+def download_folder(folder_url: str, parallel: int):
     """Downloads the contents of the folder."""
     api_url = "https://www.mediafire.com/api/1.5/folder/get_content.php"
     folder_api_url = "https://www.mediafire.com/api/1.5/folder/get_info.php?r=osqf"
@@ -73,7 +74,7 @@ def download_folder(folder_url: str):
         "response_format": "json",
     }
 
-    folder_info = session.post(folder_api_url, post_data).json()
+    folder_info = session.post(url=folder_api_url, data=post_data).json()
     folder_info = folder_info["response"]
 
     if folder_info.get("folder_info") is None:
@@ -83,10 +84,19 @@ def download_folder(folder_url: str):
     folder_name = folder_info["folder_info"]["name"]
 
     if not os.path.exists(folder_name):
-        os.mkdir(folder_name)
+        os.mkdir(path=folder_name)
 
-    for content in response.get("files", []):
-        download_file(content, folder_name)
+    files = response.get("files", [])
+
+    if parallel > 1:
+        # Download n number of files in  parallel
+        args = [(file, folder_name) for file in files]
+
+        with Pool(processes=parallel) as pool:
+            pool.starmap(func=download_file, iterable=args)
+    else:
+        for file in files:
+            download_file(file_dict=file, folder_name=folder_name)
 
 
 def main():
@@ -96,8 +106,22 @@ def main():
     parser.add_argument(
         "folder_url", nargs=1, help="Mediafire folder url to download from"
     )
+    parser.add_argument(
+        "-p",
+        "--parallel",
+        help="How many files to download in parallel. Default is 1",
+        choices=range(1, 6),
+        default=1,
+        type=int,
+        nargs=1,
+    )
     args = parser.parse_args()
-    download_folder(args.folder_url[0])
+
+    parallel = args.parallel
+    if isinstance(parallel, list):
+        parallel = args.parallel[0]
+
+    download_folder(folder_url=args.folder_url[0], parallel=parallel)
 
 
 if __name__ == "__main__":
