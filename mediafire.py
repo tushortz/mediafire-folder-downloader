@@ -25,7 +25,7 @@ def download_file(file_dict, folder_name="tmp"):
     if link:
         link = link.group(1)
     else:
-        print("Can't parse download link for {filename}")
+        print(f"Can't parse download link for {filename}")
         return
 
     size = int(file_dict.get("size", "0"))
