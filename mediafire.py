@@ -15,15 +15,16 @@ CHUNK_SIZE = 512 * 1024  # 512 KB
 
 def download_file(file_dict, folder_name="tmp"):
     """Downloads the file using the file metadata"""
-
     filename = file_dict.get("filename")
     url = file_dict["links"]["normal_download"]
 
     page = requests.get(url, timeout=5).text
     link = re.search(r'href="((http|https)://download[^"]+)', page)
 
-    if link:
+    if link is not None:
         link = link.group(1)
+    elif isinstance(page, (str, bytes)):
+        link = url
     else:
         print(f"Can't parse download link for {filename}")
         return
@@ -50,7 +51,11 @@ def download_folder(folder_url: str, parallel: int):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
     }
 
-    folder_key = re.search(r"folder/(\w+)/?", folder_url).group(1)
+    folder_key = folder_url.split("#")
+    if len(folder_key) > 1:
+        folder_key = folder_key[-1]
+    else:
+        folder_key = re.search(r"folder/(\w+)/?", folder_url).group(1)
 
     params = {
         "r": "budo",
